@@ -1,0 +1,470 @@
+---
+title: "Final Project STA 141A"
+author: "Emily Callahan"
+date: "2023-05-07"
+output: html_document
+---
+Abstract
+In this project I will analyise the Data set from Steinmetz's 2019 experiment, "Sensory coding and the causal impact of mouse cortex in a visual decision", exploring how the amount of sessions and parts of the brain used in a trial can affect the final outcome of the success rate.  
+
+Introduction
+In this report questions about Steinmetz's 2019 experiment, "Sensory coding and the causal impact of mouse cortex in a visual decision". Why did some mice use less parts of their brain? Does the amount of brain parts used affect the success rate? Using variables such as mouse_name (the name of the mouse for specific sessions), data_exp (the date of the experiment), n_brain_area(the unique brain area involved), n_neurons (the number of neurons), n_trials (the number of trials in each session), and success_rate( the ratio of successful trials to the total number of trials), visuals will be displayed answering questions such as, Do the amount of sessions affect the success rate? and Is using more parts of the brain related to a higher success rate?
+
+Background
+The experiment preformed by Steinmetz in 2019 on Sensory coding and the causal impact of mouse cortex in a visual decision, involved testing on 10 mice over 39 sessions. In this analysis we will be focusing on the spike of neurons from the onset of stimuli using 4 mice over 18 sessions. The sessions include several hundred trials where visual stimuli was presented to the mouse randomly with screens placed on either side of the mouse. The mouse was required to move a wheel either right or left, depending on the screen the stimuli was presented on. For example, if the stimuli was placed on the left screen, the mouse would be rewarded for turning the wheel left, but the mouse was punished if the wheel was turned right. If no stimuli was shown, the mouse must do nothing to be rewarded, and would otherwise get a penalty. If there was stimuli on both sides, the mouse must turn the wheel, either direction resulting in a reward. During this experiment. The mices' neuron activity in the visual cortex was monitored and recorded, along with the time stamps of the corresponding neuron firing. In this report, the .... of the experiment will be displayed.  
+
+Exploratory analysis
+Part 1
+i.) 
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+```{r, echo = FALSE}
+setwd("/Users/emilycallahan/Downloads/sessions") 
+session=list()
+for(i in 1:18)
+  session[[i]]=readRDS(paste('session',i,'.rds',sep=''))
+```
+```{r, echo = FALSE}
+library(tidyverse) 
+library(magrittr)   
+library(knitr) 
+library(dplyr)  
+```
+
+```{r, echo = FALSE}
+#determine the number of sessions in the 'session' list
+n.session=length(session)
+
+#create a tibble called 'meta' to store the summar statistics
+meta <- tibble(
+  mouse_name = rep('name',n.session),
+  date_exp =rep('dt',n.session),
+  n_brain_area = rep(0,n.session),
+  n_neurons = rep(0,n.session),
+  n_trials = rep(0,n.session),
+  success_rate = rep(0,n.session)
+)
+#Initialize 'mouse_name' column with 'name
+#Initialize 'date_exp' column with 'dt'
+#Initialize 'n_brain_area' column with seros
+#Initialize 'n_trials' column with zeros
+#Initialize 'success_rate' column with zeros
+
+#Iterate over each session to calculate summary statistics
+#access the i-th session
+for(i in 1:n.session){
+  tmp = session[[i]];
+
+  #extract relevant information from the current sessions and update the corresponding columns in 'meta'
+  meta[i,1]=tmp$mouse_name;
+  meta[i,2]=tmp$date_exp;
+  meta[i,3]=length(unique(tmp$brain_area));
+  meta[i,4]=dim(tmp$spks[[1]])[1];
+  meta[i,5]=length(tmp$feedback_type);
+  meta[i,6]=mean(tmp$feedback_type+1)/2;
+}
+
+#Store mouse name in the 'mouse_name' column
+#Store date of experiment in the date_exp column
+#Calculate the number of unique brain areas and store in the 'n_brain_area' column
+#Determine the number of neurons and store in the n_neurons' column
+#calculate the number of trials and store in the n_trials column
+#Calculate the averare success rate and store in the 'success_rate' column
+```
+
+```{r, echo = FALSE}
+#Render the 'meta' tibble as an HTML table
+#specify that the output format should be html
+#add CSS classes to the table for styling
+#specify the number of decimal places to displayin numeric columns
+
+kable(meta, format = "html", table.attr = "class='table table-striped'",digits=2) 
+```
+ii.) 
+The 1769 neurons in Session 13 are located in ACA, CA1, DG, LGd, MB, MOs, MRN, MS, PL, RN, root, SCm, SCs, VISam, ZI of the mouse brain. We can visualize the activities of these areas across the 300 trials. In this session the most parts of the brain were used and the session has one of the highest success rates. 
+
+```{r, echo = FALSE}
+#set value of i.s to 13
+i.s=13 
+#set the value of i.t to 1
+i.t=1
+
+#retrieve the spike dta for the specified session and trial
+spk.trial = session[[i.s]]$spks[[i.t]]
+#retrieve the brain area information for the specified session
+area=session[[i.s]]$brain_area
+
+#calculate the total spike count for each neuron in the trial 
+spk.count=apply(spk.trial,1,sum)
+#Calculate the average spike count for each brain area using 'tapply'
+spk.average.tapply=tapply(spk.count, area, mean)
+
+#Create a data frame with 'area' and 'spk.count' columns
+tmp <- data.frame(
+  area = area,
+  spikes = spk.count
+)
+
+#use 'dplyr' to group the data frame by 'area' and calculate the mean spike count
+spk.average.dplyr =tmp %>%
+  group_by(area) %>%
+  summarize(mean= mean(spikes))
+```
+
+```{r, echo = FALSE}
+#define function called 'average_spike_area' that takes 'i.t' and 'this_session' as arguments
+average_spike_area<-function(i.t,this_session){
+  #retrieve the spike data for the specified trial
+  spk.trial = this_session$spks[[i.t]]
+  #retrieve the brain area information
+  area= this_session$brain_area
+  #calculate the total soike count for each neuron in the trial
+  spk.count=apply(spk.trial,1,sum)
+  #Calculate the averae spike count for each brain area using 'tapply'
+  spk.average.tapply=tapply(spk.count, area, mean)
+  #return the average spike count for each brain area
+  return(spk.average.tapply)
+  }
+
+#Call the 'average_spike_area' function with 'i.t' set to 1 and 'this_session' as session[[i.s]]
+average_spike_area(1,this_session = session[[i.s]])
+```
+
+```{r, echo = FALSE}
+#determine the number of trials in the specified session and set it to 'n.trial'
+n.trial=length(session[[i.s]]$feedback_type)
+#determine the number of unique brain areas in the specified session and set it to 'n.area'
+n.area=length(unique(session[[i.s]]$brain_area ))
+
+#Create a matrix called 'trial.summary' to store the trial summary information
+#the matrix has 'n.trial' rows and 'n.area +1+2+1' columns 
+trial.summary =matrix(nrow=n.trial,ncol= n.area+1+2+1)
+
+#iterate over each trial in the session
+for(i.t in 1:n.trial){
+  #fill each row of 'trial.summary' with the average spike area, feedback type, left contrast, right contrast, and trial id
+  trial.summary[i.t,]=c(average_spike_area(i.t,this_session = session[[i.s]]),
+                          session[[i.s]]$feedback_type[i.t],
+                        session[[i.s]]$contrast_left[i.t],
+                        session[[i.s]]$contrast_right[i.s],
+                        i.t)
+}
+
+#set the column names of trial.summary' to the names of average spike area, feedback, left contrast, right constrast, and id
+colnames(trial.summary)=c(names(average_spike_area(i.t,this_session = session[[i.s]])), 'feedback', 'left contr.','right contr.','id' )
+
+# Turning it into a data frame
+trial.summary <- as_tibble(trial.summary)
+```
+
+```{r, echo = FALSE}
+#generate a vector of colors using 'rainbow' function, with 'n.area' as the number of colors and 'alpha' as the transparency level
+area.col=rainbow(n=n.area,alpha=0.7)
+
+#creat an empty plot with white background, specifying the x-axis and y-axis limits, and labeling the axes and main title
+plot(x=1,y=0, col='white',xlim=c(0,n.trial),ylim=c(0.5,2.2), xlab="Trials",ylab="Average spike counts", main=paste("Spikes per area in Session", i.s))
+
+
+#iterate over each brain area
+for(i in 1:n.area){
+  #plot dashed lines connecting the data points for each brain area
+  lines(y=trial.summary[[i]],x=trial.summary$id,col=area.col[i],lty=2,lwd=1)
+  #plot a smoothed line using 'smooth.spline' to represent the trend of the data points for each brain area
+  lines(smooth.spline(trial.summary$id, trial.summary[[i]]),col=area.col[i],lwd=3)
+}
+
+#add a legend to the top-right corner of the plot, specifying the labels,colors, line types, and font size
+legend("topright", 
+  legend = colnames(trial.summary)[1:n.area], 
+  col = area.col, 
+  lty = 1, 
+  cex = 0.8
+)
+```
+
+#Through the number of trials across sections you can see that each mouse was given a different amount of trials, this could affect the outcome of their success as it should be assumed they would learn the more opportunnities they are given while being tested. For example, sessions 2 and 8 were given 251 and 250 trials respectivly, and both recieve a very similar success rate of .63 and .64. 
+#Number of Trials Accross Sessions - the bar plot shows the number of trials in each session. Differences in the number of trials across sessions indicate heterogeneity in experiemental conditions. 
+
+```{r, echo = FALSE}
+#dermine the number of sessions 
+sessions <- length(session)
+#calcuate the number of neurons in each session using the 'sapply' function
+neurons <- sapply(session, function(s)length(s$spks))
+
+#calculate the number of trials in each session using the 'sapply' function
+num_trials <-sapply(session,function(s) length(s$spks))
+
+#create a bar plot of the number of trials across sessions 
+barplot(num_trials,
+        xlab = "Session",
+        ylab = "Number of Trials",
+        main = "Number of Trials Across Sessions")
+```
+
+
+```{r, echo = FALSE}
+#define a function called 'plot.trial' that takes 'i.t', 'area', 'area.col',and 'this_session' as arguments
+plot.trial<-function(i.t,area, area.col,this_session){
+    
+  #retrieve the spike data for the specified trial
+    spks=this_session$spks[[i.t]];
+    #determine the number of neurons in the spike data
+    n.neuron=dim(spks)[1]
+    #retrieve the time points for the specifed trial
+    time.points=this_session$time[[i.t]]
+    
+    #create an empty plot with appropriate x-axis and y-axis limits, labels, and title
+    plot(0,0,xlim=c(min(time.points),max(time.points)),ylim=c(0,n.neuron+1),col='white', xlab='Time (s)',yaxt='n', ylab='Neuron', main=paste('Trial ',i.t, 'feedback', this_session$feedback_type[i.t] ),cex.lab=1.5)
+    
+    #iterate over each neuron
+    for(i in 1:n.neuron){
+      #determine the index of the current neuron's brain area in the 'area' vector
+        i.a=which(area== this_session$brain_area[i]);
+        #retrieve the color for the current neuron's brain area
+        col.this=area.col[i.a]
+        
+        #determine the indices of the spikes for the current neuron
+        ids.spike=which(spks[i,]>0)
+        #check if there are any spikes for the current neuron
+        if( length(ids.spike)>0 ){
+          #plot the spikes as points at the corresponding time points and neuron position
+            points(x=time.points[ids.spike],y=rep(i, length(ids.spike) ),pch='.',cex=2, col=col.this)
+        }
+    }
+#add legend to the top-right corner of the plot, specify the labels, colors, symbol types, and font size    
+legend("topright", 
+  legend = area, 
+  col = area.col, 
+  pch = 16, 
+  cex = 0.8
+  )
+  }
+```
+
+```{r, echo = FALSE}
+#extract the variable names from 'trial.summary'
+varname=names(trial.summary);
+#extract the brain area names from the variable names, excluding the last for columns
+area=varname[1:(length(varname)-4)]
+#call the 'plot.trial' function with the specified arguments
+plot.trial(1,area, area.col,session[[i.s]])
+```
+
+part iii./iv.) From the following visuals you can see that in session 13, with mouse Lederberg, 15 parts of the brain of the brain are being used rapidly and result in a .80 success rate. This use of brain parts is used across many trails in the duration of the session, displayed in the visuals from trials 2 and 200. In session 2,with mouse Cori, only 5 parts of the brain are being used and used at a slower rate. In this session the success rate is only .60. This is consistent within over the course of session 2 shown through the neuron feedback times in trials 2 and 200. This show heterogeneity as trials among different sessions result in different brain activity and success rates.  
+
+```{r, echo = FALSE}
+#extract the variable names from 'trial.summary'
+varname=names(trial.summary);
+#extract the brain area names from the variable names, excluding the last four columns
+area=varname[1:(length(varname)-4)]
+#set the plot layout to have 1 row and 2 columns
+par(mfrow=c(1,2))
+#call the 'plot.trial' function with the specified arguments for the second trial
+plot.trial(2,area, area.col,session[[i.s]])
+#call the 'plot.trial' function with the specified arguments for the 200th  trial
+plot.trial(200,area, area.col,session[[i.s]])
+```
+
+```{r, echo = FALSE}
+i.v = 2
+varname=names(trial.summary);
+area=varname[1:(length(varname)-4)]
+par(mfrow=c(1,2))
+plot.trial(2,area, area.col,session[[i.v]])
+plot.trial(200,area, area.col,session[[i.v]])
+```
+iv.)
+#Brain Area Distribution - the bar plot below illustrates the frequency distribution of brain areas across mice. Displaying how specific brain areas are more dominate in the records of the experiment and that certain brain areas are hardly used. This displays heterogeneity.
+
+```{r, echo = FALSE}
+#calculate the number of sessions per mouse using 'sapply', 'unlist', and 'lapply'
+sessions_per_mouse <- sapply(unique(unlist(lapply(session,function(s)s$mouse_name))),
+                             function(m)sum(unlist(lapply(session, function(s)s$mouse_name==m))))
+
+#calculate the distribution of brain areas across sessions using 'table','unlist',and 'lapply'
+brain_area_distribution <- table(unlist(lapply(session,function(s)s$brain_area)))
+
+#print the sessions per mouse
+cat("Sessions per mouse:\n")
+print(sessions_per_mouse)
+
+#print the brain area distribution
+cat("Brain Area Distribution:\n")
+print(brain_area_distribution)
+```
+```{r, echo = FALSE}
+#create a bar plot of the brain area distribution using 'barplot'
+barplot(brain_area_distribution, xlab= "Brain Area", ylab = "frequency",
+        main ="Brain Area Distribution Amongst Mice")
+```
+
+```{r, echo = FALSE}
+#load library ggplot2
+library(ggplot2)
+```
+
+#Data integration
+#Part 2
+
+#The plots below investigate the differences between the sessions by extracting the how each session has different success rates that have similar patterns to their differences in brain area, and brain spike mean. For example, Cori did the least amount of sessions and has the lowest average success rate, whereas Lederberg did the most sessions and has the highest average success rate. 
+```{r, echo = FALSE}
+library(tidyverse)
+```
+```{r, echo = FALSE}
+#Create an empty success matrix with 18 rows and 3 columns
+success.matrix <- base::matrix(nrow = 18, ncol = 3)
+#Create an empty list to store names
+names.list = list()
+
+
+#define a function to calculate success percentage for a given session
+success.percent <-function(s) {
+  z = sum(session[[s]]$feedback_type == 1) 
+
+  percent.success = 100*z/length(session[[s]]$feedback_type)
+  return(percent.success)
+}
+
+#iterate over sessions and calculate success percentage
+for(s in 1:18) {
+  success.matrix[s,] = c(s,success.percent(s), session[[s]]$mouse_name)
+}
+#assign column names to success matrix
+colnames(success.matrix)= c("session.number", "success.percent","mouse.name")
+#convert success matrix to a tibble
+success.table <- as_tibble(success.matrix)%>%
+  mutate(success.percent = as.numeric(success.percent))%>%
+           mutate(session.number = as.numeric(session.number))
+
+#create a ggplot with success table data
+ggplot(success.table,aes(x = session.number, y = success.percent))+
+                         geom_point(aes(group= mouse.name,color = mouse.name))+
+                           theme_bw()+
+                           geom_line(aes(group= mouse.name,color = mouse.name))+
+                           ylab("success percentage")+
+                           xlab("session number")
+
+```
+
+```{r, echo = FALSE}
+#creating an empty matrix with 18 rows and 3 columns
+mean.matrix <- base::matrix(nrow = 18 , ncol = 3)
+names.list = list()
+
+for(s in 1:18){
+  for(t in length(session[[s]]$feedback_type)){
+    spks.mean = mean(c(session[[s]]$spks[[t]]))
+  }
+  mean.matrix[s,] = c(s,spks.mean, session[[s]]$mouse_name)
+}
+#assign colnames
+colnames(mean.matrix) = c("Session Number", "Average Spike Count", "Mouse Name")
+#converting the matrix to a tibble for easier data manipulation
+mean.table <- as_tibble(mean.matrix)
+
+session.number = mean.table$`Session Number`
+mouse.name = mean.table$`Mouse Name`
+spks.mean = mean.table$`Average Spike Count`
+
+#creating a scatter plot with lines
+ggplot(mean.table, aes(x = session.number, y = spks.mean))+
+ geom_point(aes(group= mouse.name,color = mouse.name))+
+ theme_bw()+
+ geom_line(aes(group= mouse.name,color = mouse.name))+
+ ylab("Average Spike Count")+
+ xlab("Session Number")
+```
+
+
+```{r, echo = FALSE}
+library(magrittr)
+```
+
+#Predictive modeling
+#Part 3
+```{r, echo = FALSE}
+library(caTools)
+library(MASS)
+```
+
+```{r, echo =FALSE}
+setwd("/Users/emilycallahan/Downloads/sessions") 
+session=list()
+for(i in 1:18)
+  session[[i]]=readRDS(paste('session',i,'.rds',sep=''))
+```
+
+```{r, echo = FALSE}
+setwd("/Users/emilycallahan/Downloads/test") 
+test=list()
+for(i in 1:2)
+  test[[i]]=readRDS(paste('test',i,'.rds',sep=''))
+```
+
+
+```{r, echo = FALSE}
+#set.seed(99)
+#assigning the feedback_type column to y 
+#y = session$feedback_type
+y = do.call("rbind",lapply(1:length(session),function(i){
+  #i = 1
+  x = session[[i]]
+  spks_result = do.call("rbind", lapply(x$spks, function(xx){
+    result = data.frame(spks_mean = mean(xx),spks_sd = sd(xx))
+    return(result)
+  }))
+  result = data.frame(sessionid = i, mouse_name = x$mouse_name, feedback_type = x$feedback_type, contrast_right = x$contrast_right,spks_result)
+  return(result)
+}))
+y$feedback_type2 = ifelse(y$feedback_type == -1, 0, 1)
+
+#splitting the data into training and test sets
+#split = sample.split(y, SplitRatio = 0.90, group = NULL)
+split = sample(nrow(y),0.9*nrow(y))
+training_set = y[split, ]
+test = y[-1*split, ]
+
+
+#creating a logistic regression model
+logit_model <- glm(feedback_type2 ~ contrast_right + spks_mean + spks_sd + (spks_mean*spks_sd), data = training_set, family = "binomial")
+
+#extracting the coefficient table from the model summary
+coef_table <- summary (logit_model)$coef
+
+#printing the model parameter estimates and standard errors
+print("Model parameter estimates and standard erros")
+print(coef_table)
+
+```
+```{r, echo = FALSE}
+#making predictiions using the logistic regression model 
+logit_predictions <- predict(logit_model, newdata = test, type = "response")
+#converting predited probabikities to class labels
+#predict_class <- ifelse(logit_predictions > 0.5, "-1","1")
+predict_class <- ifelse(logit_predictions > 0.5, 1 , 0)
+#creating a confusion matrix
+confusion_matrix <- table(Actual = test$feedback_type2, Predicted = predict_class)
+
+#printing the confusion matrix
+print("confusion matrix")
+print(confusion_matrix)
+
+#calculating the misclassification error rate
+misclassification_rate <- sum(diag(confusion_matrix))/ sum(confusion_matrix)
+#printing the misclassification error rate
+cat("misclassification error rate:", misclassification_rate, "\n")
+
+```
+Discussion
+In this report I answered questions about Steinmetz's 2019 experiment, "Sensory coding and the causal impact of mouse cortex in a visual decision". Why did some mice use less parts of their brain? Does the amount of brain parts used affect the success rate? Using variables such as mouse_name (the name of the mouse for specific sessions), data_exp (the date of the experiment), n_brain_area(the unique brain area involved), n_neurons (the number of neurons), n_trials (the number of trials in each session), and success_rate( the ratio of successful trials to the total number of trials), visuals will be displayed answering questions such as, Do the amount of sessions affect the success rate? and Is using more parts of the brain related to a higher success rate? Accordding to the plots their is a correlation between the amount of trials and brain areas and success rate.In the end I built a predictive model and confusion matrix which was able to predict with a misclassification error rate under .35. 
+
+
+
+#SESSION INFO
+```{r, echo = FALSE}
+sessionInfo()
+```
+
+
+
